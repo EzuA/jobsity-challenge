@@ -1,0 +1,9 @@
+ingestion:
+  landing_file: /var/lib/postgresql/data/raw_data/fake
+  schema_name: jobsity
+  table_name: trips
+  pre_action: TRUNCATE TABLE {schema_name}.{table_name};
+  action: >
+    COPY {schema_name}.{table_name}
+    (region, origin_coord, destination_coord, datetime, datasource)
+    FROM PROGRAM  'awk FNR-1 {landing_file}/*.csv | cat' WITH (FORMAT CSV, DELIMITER ',');
