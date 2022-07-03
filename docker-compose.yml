@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  postgres:
+    image: postgis/postgis
+    shm_size: 2g
+    ports:
+      - 5432:5432
+    networks:
+      - postgres
+      - api
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: ${PGDATA}
+    volumes:
+      - $PWD/raw_data:/var/lib/postgresql/data/raw_data
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 5s
+      retries: 5
+    restart: always
+
+networks:
+  postgres:
+    driver: bridge
