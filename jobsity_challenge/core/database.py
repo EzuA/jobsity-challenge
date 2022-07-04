@@ -1,7 +1,7 @@
 import time
 import logging
 import logging.config
-from typing import Any, Dict, Union, Optional
+from typing import Any, Dict, Optional
 
 from sqlalchemy.sql import text
 from sqlalchemy import create_engine
@@ -48,7 +48,7 @@ class Database(BaseModel):
 
     def execute_query(
         self, query: str, query_params: Optional[Dict[str, Any]] = None
-    ) -> Union[Result, None]:
+    ) -> Result:
         start = time.time()
         query_params = query_params or {}
 
