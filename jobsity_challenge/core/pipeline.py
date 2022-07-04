@@ -7,8 +7,8 @@ from typing import Dict, List
 
 import yaml
 
-from jobsity_challenge.core.trips import Report
 from jobsity_challenge.models import ApiInputConfig
+from jobsity_challenge.core.trips import Report, BaseJob
 from jobsity_challenge.core.slack import slack_send_alert
 from jobsity_challenge.constants import DDL_FILE, LOG_CONFIG, CONFIG_FILE
 
@@ -23,6 +23,11 @@ def get_pipeline_config() -> Dict:
     with open(ROOT_DIR / CONFIG_FILE, "r", encoding="utf-8") as f:
         config: Dict = yaml.safe_load(f)
     return config
+
+
+def init_db() -> None:
+    job = BaseJob(action="Init database")
+    job.init_db(script_path=ROOT_DIR / DDL_FILE)
 
 
 def ingest_data(api_input_config: ApiInputConfig, process_id: str) -> None:
@@ -46,6 +51,12 @@ def transform_data(api_input_config: ApiInputConfig, process_id: str) -> None:
             process_config=config_table,
             process_id=process_id,
         )
+
+
+def run_all(api_input_config: ApiInputConfig, process_id: str) -> None:
+    init_db()
+    ingest_data(api_input_config, process_id)
+    transform_data(api_input_config, process_id)
 
 
 def run_process(
@@ -79,6 +90,15 @@ def run_process(
                 icon_emoji=":red_circle:",
             )
         raise e
+    else:
+        if SLACK_WEBHOOK_URL and process_type == "Ingestion":
+            # We are interested in ingestion process success, not in every process
+            slack_send_alert(
+                webhook_url=SLACK_WEBHOOK_URL,
+                title=f"Jobsity - Trips {process_type.lower()}",
+                message=f"*Process ID*: {process_id}\n\n*Status*: {process_type.lower()} executed succesfully",
+                icon_emoji=":white_check_mark:",
+            )
 
 
 def get_weekly_average(config_key: str, params: Dict) -> List[Dict]:
@@ -96,8 +116,7 @@ def get_weekly_average(config_key: str, params: Dict) -> List[Dict]:
 
 if __name__ == "__main__":
     # Testing run
-    ingest_data(ApiInputConfig(full_load=False, init_db=True), process_id="test")
-    transform_data(ApiInputConfig(full_load=False), process_id="test")
+    run_all(ApiInputConfig(full_load=True), process_id="Reset database and data")
     print(
         get_weekly_average(
             config_key="weekly_average_report_region", params={"region": "Prague"}
