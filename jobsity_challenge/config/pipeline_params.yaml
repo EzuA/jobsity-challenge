@@ -19,8 +19,8 @@ transform:
     table_target:
       schema_name: dwh
       table_name: region
-    clean_action: TRUNCATE TABLE {table_target};
     action: >
+      TRUNCATE TABLE {table_target};
       INSERT INTO {table_target} (region_name)
       SELECT DISTINCT region FROM {table_source};
     post_action: >
@@ -32,8 +32,8 @@ transform:
     table_target:
       schema_name: dwh
       table_name: datasource
-    clean_action: TRUNCATE TABLE {table_target};
     action: >
+      TRUNCATE TABLE {table_target};
       INSERT INTO {table_target} (datasource_name)
       SELECT DISTINCT datasource FROM {table_source};
     post_action: >
@@ -70,23 +70,22 @@ transform:
     post_action: >
       VACUUM ANALYZE {table_target};
 
-
 weekly_average_report_region:
   query: >
     WITH agg_data AS (
         SELECT
-            DATE_PART('year', datetime) AS year,
-            DATE_PART('week', datetime) AS week,
+            year,
+            week,
             count(*) AS count_week
         FROM
-            raw.trips as raw
+            dwh.fact_trips as f
         INNER JOIN dwh.region as r
-        ON raw.region = r.region_name
+        ON f.region_id = r.id
         WHERE
             r.region_name = :region
         GROUP BY
-            DATE_PART('year', datetime),
-            DATE_PART('week', datetime)
+            year,
+            week
     )
     SELECT
         ROUND(AVG(count_week), 2)
@@ -97,25 +96,25 @@ weekly_average_report_bounding_box:
   query: >
     WITH agg_data AS (
         SELECT
-            DATE_PART('year', datetime) AS year,
-            DATE_PART('week', datetime) AS week,
+            year,
+            week,
             count(*) AS count_week
         FROM
-            dwh.trips
+            dwh.fact_trips
         WHERE
             ST_Contains(
                 ST_MakeEnvelope (
                   :lon_min, :lat_min, -- min point(x,y)
                   :lon_max, :lat_max, -- max point(x,y)
                   :srid), origin_coord)
-            OR ST_Contains(
+            AND ST_Contains(
                   ST_MakeEnvelope (
                     :lon_min, :lat_min, -- min point(x,y)
                     :lon_max, :lat_max, -- max point(x,y)
                     :srid), destination_coord)
         GROUP BY
-            DATE_PART('year', datetime),
-            DATE_PART('week', datetime)
+            year,
+            week
     )
     SELECT
         ROUND(AVG(count_week), 2)
