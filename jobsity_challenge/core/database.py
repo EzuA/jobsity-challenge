@@ -1,3 +1,4 @@
+import time
 import logging
 import logging.config
 from typing import Any, Dict, Union, Optional
@@ -37,21 +38,28 @@ class Database(BaseModel):
         logger.info("Connecting to the database")
 
         conn_string = f"{self.engine_type}://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
-        engine = create_engine(conn_string, future=True)
+        engine = create_engine(
+            conn_string,
+            future=True,
+            execution_options={"isolation_level": "AUTOCOMMIT"},
+        )
 
         return engine
 
     def execute_query(
         self, query: str, query_params: Optional[Dict[str, Any]] = None
     ) -> Union[Result, None]:
+        start = time.time()
         query_params = query_params or {}
 
         try:
             query = query.format(**query_params)
-            logger.info(f"Executing: {query}")
+            logger.info(f"Executing: {query.strip()}")
 
             with self.engine.begin() as conn:
                 results = conn.execute(text(query), query_params)
+                end = time.time()
+                logger.info(f"Elapsed time query: {round(end - start,2)}")
         except SQLAlchemyError as e:
             raise e
 
