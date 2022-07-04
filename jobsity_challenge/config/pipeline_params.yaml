@@ -1,9 +1,123 @@
 ingestion:
-  landing_file: /var/lib/postgresql/data/raw_data/fake
-  schema_name: jobsity
-  table_name: trips
-  pre_action: TRUNCATE TABLE {schema_name}.{table_name};
+  # landing_file: /var/lib/postgresql/data/raw_data/fake
+  landing_file: /var/lib/postgresql/data/raw_data/
+  table_target:
+    schema_name: raw
+    table_name: trips
+  clean_action: TRUNCATE TABLE {table_target};
   action: >
-    COPY {schema_name}.{table_name}
+    COPY {table_target}
     (region, origin_coord, destination_coord, datetime, datasource)
-    FROM PROGRAM  'awk FNR-1 {landing_file}/*.csv | cat' WITH (FORMAT CSV, DELIMITER ',');
+    FROM PROGRAM  'awk FNR-1 {landing_file}/trips*.csv | cat' WITH (FORMAT CSV, DELIMITER ',');
+  post_action: >
+    VACUUM ANALYZE {table_target};
+
+transform:
+  - table_source:
+      schema_name: raw
+      table_name: trips
+    table_target:
+      schema_name: dwh
+      table_name: region
+    clean_action: TRUNCATE TABLE {table_target};
+    action: >
+      INSERT INTO {table_target} (region_name)
+      SELECT DISTINCT region FROM {table_source};
+    post_action: >
+      VACUUM ANALYZE {table_target};
+
+  - table_source:
+      schema_name: raw
+      table_name: trips
+    table_target:
+      schema_name: dwh
+      table_name: datasource
+    clean_action: TRUNCATE TABLE {table_target};
+    action: >
+      INSERT INTO {table_target} (datasource_name)
+      SELECT DISTINCT datasource FROM {table_source};
+    post_action: >
+      VACUUM ANALYZE {table_target};
+
+  - table_source:
+      schema_name: raw
+      table_name: trips
+    table_target:
+      schema_name: dwh
+      table_name: fact_trips
+    clean_action: TRUNCATE TABLE {table_target};
+    action: >
+      INSERT INTO
+          {table_target} (
+              year,
+              week,
+              region_id,
+              datasource_id,
+              origin_coord,
+              destination_coord
+          )
+      SELECT
+          DATE_PART('year', datetime),
+          DATE_PART('week', datetime),
+          r.id,
+          d.id,
+          origin_coord,
+          destination_coord
+      FROM
+          {table_source} AS t
+          INNER JOIN dwh.datasource AS d ON d.datasource_name = t.datasource
+          INNER JOIN dwh.region AS r ON r.region_name = t.region;
+    post_action: >
+      VACUUM ANALYZE {table_target};
+
+
+weekly_average_report_region:
+  query: >
+    WITH agg_data AS (
+        SELECT
+            DATE_PART('year', datetime) AS year,
+            DATE_PART('week', datetime) AS week,
+            count(*) AS count_week
+        FROM
+            raw.trips as raw
+        INNER JOIN dwh.region as r
+        ON raw.region = r.region_name
+        WHERE
+            r.region_name = :region
+        GROUP BY
+            DATE_PART('year', datetime),
+            DATE_PART('week', datetime)
+    )
+    SELECT
+        ROUND(AVG(count_week), 2)
+    FROM
+        agg_data
+
+weekly_average_report_bounding_box:
+  query: >
+    WITH agg_data AS (
+        SELECT
+            DATE_PART('year', datetime) AS year,
+            DATE_PART('week', datetime) AS week,
+            count(*) AS count_week
+        FROM
+            dwh.trips
+        WHERE
+            ST_Contains(
+                ST_MakeEnvelope (
+                  :lon_min, :lat_min, -- min point(x,y)
+                  :lon_max, :lat_max, -- max point(x,y)
+                  :srid), origin_coord)
+            OR ST_Contains(
+                  ST_MakeEnvelope (
+                    :lon_min, :lat_min, -- min point(x,y)
+                    :lon_max, :lat_max, -- max point(x,y)
+                    :srid), destination_coord)
+        GROUP BY
+            DATE_PART('year', datetime),
+            DATE_PART('week', datetime)
+    )
+    SELECT
+        ROUND(AVG(count_week), 2)
+    FROM
+        agg_data
