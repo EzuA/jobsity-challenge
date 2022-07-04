@@ -1,3 +1,4 @@
+"""Pipeline runner module."""
 import os
 import logging
 import importlib
@@ -26,11 +27,23 @@ def get_pipeline_config() -> Dict:
 
 
 def init_db() -> None:
+    """Initialize the database."""
     job = BaseJob(action="Init database")
+
+    # jobsity_challenge/config/init_ddl.sql
     job.init_db(script_path=ROOT_DIR / DDL_FILE)
 
 
 def ingest_data(api_input_config: ApiInputConfig, process_id: str) -> None:
+    """Ingest the data to the database.
+
+    Parameters
+    ----------
+    api_input_config : ApiInputConfig
+        Input parameters class
+    process_id : str
+        Hash that identifies a specific run
+    """
     config = get_pipeline_config()["ingestion"]
 
     run_process(
@@ -42,6 +55,15 @@ def ingest_data(api_input_config: ApiInputConfig, process_id: str) -> None:
 
 
 def transform_data(api_input_config: ApiInputConfig, process_id: str) -> None:
+    """Run transformation queries.
+
+    Parameters
+    ----------
+    api_input_config : ApiInputConfig
+        Input parameters class
+    process_id : str
+        Hash that identifies a specific run
+    """
     tables = get_pipeline_config()["transform"]
 
     for config_table in tables:
@@ -54,6 +76,15 @@ def transform_data(api_input_config: ApiInputConfig, process_id: str) -> None:
 
 
 def run_all(api_input_config: ApiInputConfig, process_id: str) -> None:
+    """Run all process.
+
+    Parameters
+    ----------
+    api_input_config : ApiInputConfig
+        Input parameters class
+    process_id : str
+        Hash that identifies a specific run
+    """
     init_db()
     ingest_data(api_input_config, process_id)
     transform_data(api_input_config, process_id)
@@ -65,6 +96,20 @@ def run_process(
     process_config: Dict,
     process_id: str,
 ) -> None:
+    """Execute a generic function used by ingestion & transform methods.
+
+    Parameters
+    ----------
+    process_type : str
+        Class type name. For example: Ingestion or Transform.
+    api_input_config : ApiInputConfig
+        Input parameters class
+    process_config : Dict
+        _description_
+    process_id : str
+        Hash that identifies a specific run
+    """
+    # Dynamic class import
     module = importlib.import_module("jobsity_challenge.core.trips")
     process_class = getattr(module, process_type)
     process = process_class(**process_config)
@@ -74,11 +119,13 @@ def run_process(
         if api_input_config.init_db:
             process.init_db(ROOT_DIR / DDL_FILE)
 
+        # Run query before the main action
         process.run_pre_action()
 
         nro_rows = process.run_action(api_input_config.full_load)
         logger.info(f"Number of rows affected: {nro_rows}")
 
+        # Run post query process, usually VACUUM ANALIZE
         process.run_post_action()
 
     except Exception as e:
@@ -102,6 +149,20 @@ def run_process(
 
 
 def get_weekly_average(config_key: str, params: Dict) -> List[Dict]:
+    """Get weekly average number of trips using params for filtering.
+
+    Parameters
+    ----------
+    config_key : str
+        Key name of the yaml config file. For example: ingestion, transform
+    params : Dict
+        Query params
+
+    Returns
+    -------
+    List[Dict]
+        Query results
+    """
     config = get_pipeline_config()[config_key]
 
     logger.info(f"Calculating weekly average trips using: {params}")

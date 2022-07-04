@@ -1,3 +1,4 @@
+"""SQL alchemy database module."""
 import time
 import logging
 import logging.config
@@ -34,7 +35,13 @@ class Database(BaseModel):
         self.engine = self.get_engine()
 
     def get_engine(self) -> Engine:
+        """Get a SQL engine using classes attributes for the conn string.
 
+        Returns
+        -------
+        Engine
+            Instance of Engine.
+        """
         logger.info("Connecting to the database")
 
         conn_string = f"{self.engine_type}://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
@@ -49,6 +56,20 @@ class Database(BaseModel):
     def execute_query(
         self, query: str, query_params: Optional[Dict[str, Any]] = None
     ) -> Result:
+        """Execute the query using the query params.
+
+        Parameters
+        ----------
+        query : str
+            Query string
+        query_params : Optional[Dict[str, Any]], optional
+            Params to be parsed, by default None
+
+        Returns
+        -------
+        Result
+            Query results
+        """
         start = time.time()
         query_params = query_params or {}
 
