@@ -54,11 +54,12 @@ In the API docs you can see the available methods of the API in two categories:
         - *weekly_average_bounding_box*: Gets the weekly average number of trips defined by a bounding box.  
 
 ### Example run:
-You can run a process using the "Try it out" button of every method:
+You can run every process using the "Try it out" button of every method.  
+The first method you need to run is **run_all** (because the database is empty by default):
 
 ![Ingest](img/api_ingest.png?raw=true "Ingest")
 
-In this case, you can change the body parameters:   
+You can change the body parameters if it is necessary, but for now you can run with the default values:   
     - `full_load`: Cleans the table and then executes the data load.  
     - `init_db`: Drops and recreates all tables in the database.
 
