@@ -81,3 +81,7 @@ The performance can be improved using a more powerful machine, postgres RDS inst
 <br /><br />
 
 ![Query](img/avg_by_box.png?raw=true "Query")
+
+## AWS Cloud set up
+
+![Query](img/aws_arch.png?raw=true "Query")
